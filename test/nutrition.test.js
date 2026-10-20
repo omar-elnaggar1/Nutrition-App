@@ -21,12 +21,12 @@ test('fat loss lowers calories and raises protein', () => {
 });
 
 test('amounts scale from per-100 g to grams eaten', () => {
-  const per100 = { calories: 59, protein: 10.3, carbs: 3.6, fat: 0.4, fiber: 0 };
-  assert.deepEqual(amountsForGrams(per100, 170), { calories: 100.3, protein: 17.5, carbs: 6.1, fat: 0.7, fiber: 0 });
+  const per100 = { calories: 59, protein: 10.3, carbs: 3.6, fat: 0.4, fiber: 0, sugar: 3.2, sodium: 36 };
+  assert.deepEqual(amountsForGrams(per100, 170), { calories: 100.3, protein: 17.5, carbs: 6.1, fat: 0.7, fiber: 0, sugar: 5.4, sodium: 61.2 });
 });
 
 test('sumEntries adds up the day', () => {
-  const a = { amounts: { calories: 100, protein: 10, carbs: 5, fat: 2, fiber: 1 } };
-  const b = { amounts: { calories: 50.5, protein: 1.2, carbs: 10, fat: 0, fiber: 2.3 } };
-  assert.deepEqual(sumEntries([a, b]), { calories: 150.5, protein: 11.2, carbs: 15, fat: 2, fiber: 3.3 });
+  const a = { amounts: { calories: 100, protein: 10, carbs: 5, fat: 2, fiber: 1, sugar: 4, sodium: 120 } };
+  const b = { amounts: { calories: 50.5, protein: 1.2, carbs: 10, fat: 0, fiber: 2.3 } }; // logged before sugar/sodium existed
+  assert.deepEqual(sumEntries([a, b]), { calories: 150.5, protein: 11.2, carbs: 15, fat: 2, fiber: 3.3, sugar: 4, sodium: 120 });
 });

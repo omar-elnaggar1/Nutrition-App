@@ -26,6 +26,14 @@ export const NUTRIENTS = [
   { key: 'fiber', label: 'Fiber', unit: 'g' },
 ];
 
+// Tracked from labels, but without a daily target.
+export const EXTRA_NUTRIENTS = [
+  { key: 'sugar', label: 'Sugar', unit: 'g' },
+  { key: 'sodium', label: 'Sodium', unit: 'mg' },
+];
+
+export const ALL_NUTRIENTS = [...NUTRIENTS, ...EXTRA_NUTRIENTS];
+
 /** Mifflin-St Jeor equation: calories your body burns at complete rest. */
 export function bmr({ weight, height, age, sex }) {
   const base = 10 * weight + 6.25 * height - 5 * age;
@@ -58,7 +66,7 @@ export function calculateTargets(profile) {
 /** Scales "per 100 g" values to the grams you actually ate. */
 export function amountsForGrams(per100, grams) {
   const result = {};
-  for (const { key } of NUTRIENTS) {
+  for (const { key } of ALL_NUTRIENTS) {
     const value = ((Number(per100[key]) || 0) * grams) / 100;
     result[key] = Math.round(value * 10) / 10; // one decimal place
   }
@@ -67,9 +75,9 @@ export function amountsForGrams(per100, grams) {
 
 /** Adds up a list of log entries into daily totals. */
 export function sumEntries(entries) {
-  const totals = Object.fromEntries(NUTRIENTS.map(({ key }) => [key, 0]));
+  const totals = Object.fromEntries(ALL_NUTRIENTS.map(({ key }) => [key, 0]));
   for (const entry of entries) {
-    for (const { key } of NUTRIENTS) totals[key] += entry.amounts[key] || 0;
+    for (const { key } of ALL_NUTRIENTS) totals[key] += entry.amounts[key] || 0;
   }
   for (const key of Object.keys(totals)) totals[key] = Math.round(totals[key] * 10) / 10;
   return totals;

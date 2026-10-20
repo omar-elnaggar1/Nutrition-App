@@ -8,6 +8,9 @@
   --accent-dark: #15803d;
   --track: #e8ebef;
   --over: #dc2626;
+  --warn: #f59e0b;
+  --warn-bg: #fffbeb;
+  --warn-text: #b45309;
   --radius: 14px;
 }
 
@@ -19,10 +22,13 @@
     --muted: #9aa3ad;
     --border: #2b3138;
     --track: #2b3138;
+    --warn-bg: #2d2412;
+    --warn-text: #fbbf24;
   }
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 
 body {
   margin: 0;
@@ -112,6 +118,37 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 0;
   font-size: 0.9rem;
 }
 .preview:empty { display: none; }
+
+/* ---- Scan label ---- */
+.small { font-size: 0.82rem; }
+.card-head .muted { margin: 0; }
+.scan-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.scan-buttons .button { margin: 0; font-size: 0.95rem; padding: 12px 8px; display: flex; align-items: center; justify-content: center; }
+.scan-status { display: flex; gap: 12px; margin-top: 14px; align-items: flex-start; }
+.scan-status img { width: 72px; height: 72px; object-fit: cover; border-radius: 10px; flex: none; background: var(--bg); }
+.scan-message { flex: 1; min-width: 0; }
+.scan-message p { margin: 0 0 6px; }
+.scan-title { font-weight: 600; }
+.scan-status.error .scan-title { color: var(--over); }
+.scan-status.loading .scan-title::before {
+  content: "";
+  display: inline-block;
+  width: 14px; height: 14px;
+  margin-right: 8px;
+  vertical-align: -2px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.scan-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.scan-actions .button { margin: 0; }
+#scan-card.busy .scan-buttons { opacity: 0.5; pointer-events: none; }
+
+/* Fields the scan couldn't read */
+input.missing { border-color: var(--warn); background: var(--warn-bg); }
+label.missing-label::after { content: " — not found, please check"; color: var(--warn-text); font-weight: 500; font-size: 0.8rem; }
 
 /* ---- Progress bars ---- */
 .bar-row { margin-bottom: 14px; }

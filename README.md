@@ -2,7 +2,9 @@
 
 A simple personal nutrition tracker that runs in your phone's browser.
 
-**Phase 1 features:** profile & daily targets · manual food logging · "My Foods" one-tap re-logging · daily dashboard with progress bars · data saved on your device.
+**Phase 1:** profile & daily targets · manual food logging · "My Foods" one-tap re-logging · daily dashboard with progress bars · data saved on your device.
+
+**Phase 2:** scan nutrition labels with your phone camera (read by Claude, with your API key kept on the server). To switch it on, see [section 7](#7-set-up-label-scanning).
 
 ---
 
@@ -48,21 +50,24 @@ You need **Node.js** (the program that runs the server).
    git checkout claude/nutrition-tracking-app-fu2xs9
    ```
    (No Git? On the GitHub page, switch to the branch above, click the green **Code** button → **Download ZIP**, unzip it, then in the terminal type `cd ` followed by a space, drag the unzipped folder into the terminal window, and press Enter.)
-5. Start the app:
+5. Install the libraries the app uses (only needed once, and again after updates):
+   ```
+   npm install
+   ```
+6. Start the app:
    ```
    npm start
    ```
    You'll see:
    ```
    Nutrition app running!
+     Label scanning: OFF (no ANTHROPIC_API_KEY in .env)
      On this computer:  http://localhost:3000
      On your phone (same Wi-Fi):  http://192.168.1.23:3000
    ```
-6. Open `http://localhost:3000` in your computer's browser.
+7. Open `http://localhost:3000` in your computer's browser.
 
 To stop the server, click in the terminal and press **Ctrl + C**.
-
-No `npm install` is needed — the app uses no extra libraries.
 
 ## 2. Open it on your phone
 
@@ -78,9 +83,10 @@ No `npm install` is needed — the app uses no extra libraries.
 ## 3. Using the app
 
 1. **Profile tab** → enter weight, height, age, sex, activity level and goal → **Save profile**. Your targets and the full calculation appear underneath.
-2. **Log tab** → type the food name, grams eaten, and the **per 100 g** numbers from the label. A preview shows what you actually ate. Leave **Also save to My Foods** ticked to save it for next time → **Log this food**.
-3. **My Foods tab** → tap **Log** to add your usual amount in one tap. Tap ✎ to log a different amount, or 🗑 to delete.
-4. **Today tab** → progress bars for each target. Bars turn red if you go over. Tap ✕ to remove an entry.
+2. **Log tab → Scan Label** → tap **📷 Take photo** (opens the camera) or **🖼️ Choose from gallery**. Claude reads the label and fills in the form below. **Yellow** fields weren't on the label: fix or fill them in. Grams eaten starts at one serving; change it to what you ate, then tap **Log this food**. If the photo didn't work, you'll see why, plus buttons to try again or type the values yourself.
+3. **Log tab (manual)** → type the food name, grams eaten, and the **per 100 g** numbers from the label. A preview shows what you actually ate. Leave **Save to My Foods** ticked to save it for next time → **Log this food**.
+4. **My Foods tab** → tap **Log** to add your usual amount in one tap. Tap ✎ to log a different amount, or 🗑 to delete.
+5. **Today tab** → progress bars for each target. Bars turn red if you go over. Tap ✕ to remove an entry.
 
 ## 4. How the targets are calculated
 
@@ -110,8 +116,9 @@ In your browser's **localStorage**, on that device. It stays there when you clos
 ## 6. Project layout (what each file does)
 
 ```
-server.js            The web server. Sends the app to your browser and will hold the
-                     Claude API key for label scanning (Phase 2).
+server.js            The web server. Sends the app to your browser and handles label scans.
+scanner.js           Server-only: sends the label photo to Claude and turns the answer into
+                     per-100 g numbers. The only file that uses your API key.
 .env.example         Template for secret settings. Copy to ".env" (never uploaded to GitHub).
 public/
   index.html         The four screens (Today, Log, My Foods, Profile).
@@ -119,22 +126,97 @@ public/
   app.js             Screen behaviour: forms, buttons, drawing lists and bars.
   nutrition.js       All the maths (targets, per-100 g scaling, daily totals).
   storage.js         Saving/loading data. The only file that touches localStorage.
-  api.js             Talks to our own server (used for photo scanning later).
+  api.js             Sends photos to our server and turns errors into friendly messages.
+  image.js           Shrinks photos on the phone before upload (fast + cheap).
+  config.js          The scanning server's address, for the GitHub Pages copy.
 test/                Automated checks of the maths. Run with: npm test
 ```
 
-## 7. Getting ready for Phase 2: label scanning with Claude
+## 7. Set up label scanning
 
-The plumbing is already in place:
-- `server.js` has a route `POST /api/scan-label`, which currently replies "coming in Phase 2".
-- `public/api.js` has `scanLabel(photo)`, which sends a photo to that route.
+### How it works (and why your key is safe)
 
-**Why it's built this way:** anything in the `public/` folder gets downloaded to the phone, where anyone could read it. So the phone never talks to Claude directly. It sends the photo to **our server**, and the server adds the secret key and calls Claude.
+```
+Phone ──photo──▶ your server (server.js + scanner.js, holds the key) ──▶ Claude (claude-haiku-5-5)
+Phone ◀──numbers── your server ◀──JSON── Claude
+```
 
-When you're ready:
-1. Get an API key at <https://console.anthropic.com/>.
-2. In the project folder, copy `.env.example` to a new file named `.env` and paste the key after `ANTHROPIC_API_KEY=`.
-3. Restart with `npm start`. Visiting `http://localhost:3000/api/health` should then show `"scanningConfigured": true`.
-4. Fill in `handleScanLabel` in `server.js` and add a "Scan label" button to the Log screen.
+Everything in `public/` is downloaded to the phone, where anyone could read it. So the phone **never** talks to Claude and never sees the key. The key lives only in a `.env` file on the server, and `.env` is listed in `.gitignore`, so it is never uploaded to GitHub.
 
-`.env` is listed in `.gitignore`, so your key is never uploaded to GitHub.
+GitHub Pages can only host the app's pages, not a server. So for scanning you also run the server somewhere: either on **Render** (free, works from your phone) or on **your computer**.
+
+### Step A: get a Claude API key
+
+1. Go to <https://console.anthropic.com> and sign up or log in.
+2. Tap **Billing** and add a small amount of credit (e.g. $5). Each scan costs a fraction of a cent.
+3. Optional but smart: under **Settings → Limits**, set a monthly spend limit (e.g. $5).
+4. Tap **API Keys** → **Create Key**, name it `nutrition-app`, and **copy** the key (it starts with `sk-ant-`). It is shown only once. Keep it somewhere private, like your password manager. Never paste it into a GitHub file.
+
+### Step B (phone only): put the server on Render
+
+1. Go to <https://render.com>, tap **Get Started**, and sign up with **GitHub**.
+2. Tap **New +** → **Web Service**. Connect your GitHub account if asked, and give Render access to the **Nutrition-App** repository. Then pick it from the list.
+3. Fill in the form:
+   - **Name:** something like `nutrition-app-omar` (this becomes part of the address)
+   - **Branch:** `claude/nutrition-tracking-app-fu2xs9`
+   - **Language / Runtime:** `Node`
+   - **Build Command:** `npm install`
+   - **Start Command:** `npm start`
+   - **Instance Type:** `Free`
+4. **Create the `.env` file on Render.** Scroll to **Environment Variables / Advanced**, find **Secret Files**, and tap **Add Secret File**:
+   - **Filename:** `.env`
+   - **Contents:** one line, with your key pasted straight after the `=` (no spaces, no quotes):
+     ```
+     ANTHROPIC_API_KEY=sk-ant-paste-your-key-here
+     ```
+   - Tap **Save**.
+
+   (If you can't find Secret Files, you can instead add an **Environment Variable** with key `ANTHROPIC_API_KEY` and your key as the value. That works the same way.)
+5. Tap **Create Web Service** (or **Deploy**). Wait for **Live** (a few minutes).
+6. Copy your address from the top of the page, e.g. `https://nutrition-app-omar.onrender.com`.
+7. Check it: open `https://YOUR-ADDRESS.onrender.com/api/health`. You should see `"scanningConfigured":true`.
+
+> The free plan "sleeps" after about 15 minutes without use, so the first scan after a break can take up to a minute. The app tells you when this is happening. Later scans are quick.
+
+### Step C (phone only): connect the GitHub Pages app to Render
+
+1. In your phone's browser, open your repo on GitHub, then tap the `public` folder → `config.js`.
+2. Tap the **pencil ✏️** (Edit) icon.
+3. Find this line:
+   ```js
+   const SCAN_SERVER_FOR_GITHUB_PAGES = '';
+   ```
+   Put your Render address between the quotes (no slash at the end):
+   ```js
+   const SCAN_SERVER_FOR_GITHUB_PAGES = 'https://nutrition-app-omar.onrender.com';
+   ```
+4. Tap **Commit changes…** → **Commit changes**.
+5. Wait about a minute for GitHub Pages to update (the **Actions** tab shows a ✅). Then fully close and reopen the app from your home-screen icon.
+
+(The Render address is not a secret, so it's fine for it to be in GitHub. The key is the secret, and it stays on Render.)
+
+### Alternative: run the server on your computer
+
+1. In the terminal, go to the project folder (see section 1), then create your `.env` file from the template:
+   - **Mac:** `cp .env.example .env`
+   - **Windows:** `copy .env.example .env`
+2. Open it in a plain text editor:
+   - **Mac:** `open -e .env`
+   - **Windows:** `notepad .env`
+3. Find the line `ANTHROPIC_API_KEY=` and paste your key straight after the `=`, with no spaces or quotes:
+   ```
+   ANTHROPIC_API_KEY=sk-ant-paste-your-key-here
+   ```
+   Save (**Ctrl + S** / **⌘ + S**) and close the editor.
+4. Check that Git will ignore it: `git check-ignore .env` should print `.env`.
+5. Run `npm install`, then `npm start`. The terminal should say **Label scanning: ON**.
+6. On your phone (same Wi-Fi), open the "On your phone" address the terminal prints.
+
+### Safety limits built in
+- At most **30 scans per hour** per device (change with `SCANS_PER_HOUR` in `.env`).
+- Only your GitHub Pages site (and the server's own pages) can use the scanner from a browser (change with `ALLOWED_ORIGINS`).
+- Photos are shrunk to about 0.2–0.5 MB on the phone before upload, and the server refuses anything too large.
+- Photos aren't stored anywhere: the server passes each one to Claude and then forgets it.
+
+### If you ever leak your key
+Go to <https://console.anthropic.com> → **API Keys**, delete it, create a new one, and paste the new key into your `.env` (or Render secret file).

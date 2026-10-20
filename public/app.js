@@ -1,10 +1,13 @@
 // Wires the screens together: reads forms, saves data, and redraws the page.
 
-import { ACTIVITY_LEVELS, GOALS, NUTRIENTS, FAT_SHARE, FIBER_PER_1000_KCAL, calculateTargets, amountsForGrams, sumEntries } from './nutrition.js';
+import { ACTIVITY_LEVELS, GOALS, NUTRIENTS, ALL_NUTRIENTS, FAT_SHARE, FIBER_PER_1000_KCAL, calculateTargets, amountsForGrams, sumEntries } from './nutrition.js';
 import * as store from './storage.js';
+import { scanLabel, ScanProblem } from './api.js';
+import { shrinkPhoto } from './image.js';
 
 const $ = (selector) => document.querySelector(selector);
-const MACROS = NUTRIENTS.map((n) => n.key);
+const MACROS = ALL_NUTRIENTS.map((n) => n.key);
+const OPTIONAL = new Set(['fiber', 'sugar', 'sodium']); // blank means 0
 const TITLES = { today: 'Today', log: 'Log food', foods: 'My Foods', profile: 'Profile' };
 
 // ---------- Small helpers ----------
@@ -123,7 +126,7 @@ function readLogForm() {
   const per100 = {};
   for (const key of MACROS) {
     const value = num(form, key);
-    per100[key] = key === 'fiber' && Number.isNaN(value) ? 0 : value; // fiber is optional
+    per100[key] = OPTIONAL.has(key) && Number.isNaN(value) ? 0 : value;
   }
   return { name, grams, per100 };
 }
@@ -141,7 +144,22 @@ function validateLog({ name, grams, per100 }) {
 function updateLogPreview() {
   const data = readLogForm();
   const ready = data.grams > 0 && ['calories', 'protein', 'carbs', 'fat'].every((k) => !Number.isNaN(data.per100[k]));
-  $('#log-preview').textContent = ready ? `You ate: ${macroLine(amountsForGrams(data.per100, data.grams))}` : '';
+  if (!ready) {
+    $('#log-preview').textContent = '';
+    return;
+  }
+  const eaten = amountsForGrams(data.per100, data.grams);
+  $('#log-preview').textContent = `You ate: ${macroLine(eaten)} · Sugar ${fmt(eaten.sugar)}g · Sodium ${fmt(eaten.sodium)}mg`;
+}
+
+/** Marks a form field the scan couldn't fill (yellow highlight). */
+function markMissing(input, missing) {
+  input.classList.toggle('missing', missing);
+  input.closest('label')?.classList.toggle('missing-label', missing);
+}
+
+function clearMissing() {
+  for (const input of $('#log-form').querySelectorAll('input.missing')) markMissing(input, false);
 }
 
 function fillLogForm(food) {
@@ -149,7 +167,8 @@ function fillLogForm(food) {
   form.reset();
   form.elements.name.value = food.name;
   form.elements.grams.value = food.defaultGrams ?? '';
-  for (const key of MACROS) form.elements[key].value = food.per100[key];
+  for (const key of MACROS) form.elements[key].value = food.per100[key] ?? '';
+  clearMissing();
   updateLogPreview();
 }
 
@@ -159,7 +178,10 @@ function logFood(name, grams, per100) {
 
 function setupLogForm() {
   const form = $('#log-form');
-  form.addEventListener('input', updateLogPreview);
+  form.addEventListener('input', (event) => {
+    if (event.target.classList.contains('missing')) markMissing(event.target, false);
+    updateLogPreview();
+  });
   form.addEventListener('submit', (event) => {
     event.preventDefault();
     const data = readLogForm();
@@ -172,9 +194,106 @@ function setupLogForm() {
       store.saveFood({ name: data.name, per100: data.per100, defaultGrams: data.grams });
     }
     form.reset();
+    clearMissing();
+    hideScanStatus();
     updateLogPreview();
     toast(`Logged ${data.name}`);
     location.hash = '#today';
+  });
+}
+
+// ---------- Scan label ----------
+
+let lastPhoto = null; // the shrunk photo, kept so "Try again" can resend it
+
+function showScanStatus(state, { title, help = '', retry = false }) {
+  const status = $('#scan-status');
+  status.hidden = false;
+  status.className = `scan-status ${state}`;
+  $('#scan-preview').hidden = !lastPhoto;
+  if (lastPhoto) $('#scan-preview').src = lastPhoto.previewUrl;
+  $('#scan-title').textContent = title;
+  $('#scan-help').textContent = help;
+  $('#scan-actions').hidden = state === 'loading';
+  $('#scan-retry').hidden = !(state === 'error' && retry);
+  $('#scan-manual').hidden = state !== 'error';
+  $('#scan-card').classList.toggle('busy', state === 'loading');
+}
+
+function hideScanStatus() {
+  $('#scan-status').hidden = true;
+  lastPhoto = null;
+}
+
+async function handlePhoto(file) {
+  if (!file) return;
+  try {
+    lastPhoto = await shrinkPhoto(file);
+  } catch {
+    lastPhoto = null;
+    const problem = new ScanProblem('bad_image');
+    showScanStatus('error', { title: problem.message, help: problem.help });
+    return;
+  }
+  await runScan();
+}
+
+async function runScan() {
+  showScanStatus('loading', { title: 'Reading the label…', help: 'This usually takes a few seconds.' });
+  const slowNotice = setTimeout(() => {
+    $('#scan-help').textContent = 'Still working… if the server was asleep, the first scan can take up to a minute.';
+  }, 8000);
+
+  try {
+    fillFromScan(await scanLabel(lastPhoto));
+  } catch (err) {
+    const problem = err instanceof ScanProblem ? err : new ScanProblem('unknown');
+    showScanStatus('error', { title: problem.message, help: problem.help, retry: problem.retry });
+  } finally {
+    clearTimeout(slowNotice);
+  }
+}
+
+/** Puts the scan result into the (editable) log form and highlights anything missing. */
+function fillFromScan(result) {
+  const form = $('#log-form');
+  form.reset();
+  clearMissing();
+
+  form.elements.name.value = result.productName ?? '';
+  markMissing(form.elements.name, !result.productName);
+  form.elements.grams.value = result.servingSizeG ?? '';
+  markMissing(form.elements.grams, !result.servingSizeG);
+  for (const key of MACROS) {
+    const value = result.per100[key];
+    form.elements[key].value = value ?? '';
+    markMissing(form.elements[key], value == null);
+  }
+  updateLogPreview();
+
+  const notes = [];
+  if (result.blurry) notes.push('The photo was a little blurry, so double-check every number.');
+  if (result.convertedFromServing.length) notes.push('The label showed per-serving values, so they were converted to per 100 g.');
+  if (result.missing.length || !result.productName || !result.servingSizeG) notes.push('Yellow fields weren’t on the label. Fill them in (or leave fiber/sugar/sodium blank for 0).');
+  notes.push(result.servingSizeG ? `Grams eaten is set to one serving (${fmt(result.servingSizeG)} g). Change it if you ate more or less.` : 'Enter how many grams you ate.');
+  showScanStatus('done', { title: '✅ Label read. Check the numbers, then tap “Log this food”.', help: notes.join(' ') });
+
+  const firstMissing = form.querySelector('input.missing');
+  (firstMissing || form.elements.grams).scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function setupScan() {
+  for (const input of [$('#scan-camera'), $('#scan-gallery')]) {
+    input.addEventListener('change', () => {
+      const file = input.files[0];
+      input.value = ''; // so picking the same photo again still triggers a scan
+      handlePhoto(file);
+    });
+  }
+  $('#scan-retry').addEventListener('click', runScan);
+  $('#scan-manual').addEventListener('click', () => {
+    hideScanStatus();
+    $('#log-form').elements.name.focus();
   });
 }
 
@@ -187,7 +306,7 @@ function renderFoods() {
   list.replaceChildren();
 
   if (!foods.length) {
-    list.append(el('li', { className: 'empty', text: query ? 'No matching foods.' : 'No saved foods yet. Log a food with “Also save to My Foods” ticked.' }));
+    list.append(el('li', { className: 'empty', text: query ? 'No matching foods.' : 'No saved foods yet. Log or scan a food with “Save to My Foods” ticked.' }));
     return;
   }
 
@@ -318,6 +437,7 @@ function setupProfileForm() {
 const renderers = { today: renderToday, log: updateLogPreview, foods: renderFoods, profile: renderProfile };
 
 setupLogForm();
+setupScan();
 setupProfileForm();
 $('#food-search').addEventListener('input', renderFoods);
 window.addEventListener('hashchange', showView);

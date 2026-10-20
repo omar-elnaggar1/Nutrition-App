@@ -35,6 +35,33 @@
 
     <!-- ===== Log food ===== -->
     <section id="view-log" class="view" hidden>
+      <div id="scan-card" class="card">
+        <div class="card-head">
+          <h2>Scan Label</h2>
+          <span class="muted small">or type the values below</span>
+        </div>
+        <div class="scan-buttons">
+          <!-- Two hidden file pickers; the labels below are what you tap. -->
+          <input id="scan-camera" type="file" accept="image/*" capture="environment" hidden>
+          <input id="scan-gallery" type="file" accept="image/*" hidden>
+          <label for="scan-camera" class="button">📷 Take photo</label>
+          <label for="scan-gallery" class="button ghost">🖼️ Choose from gallery</label>
+        </div>
+
+        <div id="scan-status" class="scan-status" hidden>
+          <img id="scan-preview" alt="Your label photo">
+          <div class="scan-message">
+            <p id="scan-title" class="scan-title"></p>
+            <p id="scan-help" class="muted small"></p>
+            <div id="scan-actions" class="scan-actions">
+              <button id="scan-retry" type="button" class="button small">Try again</button>
+              <label id="scan-another" for="scan-camera" class="button small ghost">Take another photo</label>
+              <button id="scan-manual" type="button" class="button small ghost">Enter manually</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <form id="log-form" class="card" novalidate>
         <label>Food name
           <input name="name" type="text" required autocomplete="off" placeholder="e.g. Greek yogurt">
@@ -50,12 +77,14 @@
           <label>Carbs (g)<input name="carbs" type="number" inputmode="decimal" min="0" step="any" required></label>
           <label>Fat (g)<input name="fat" type="number" inputmode="decimal" min="0" step="any" required></label>
           <label>Fiber (g)<input name="fiber" type="number" inputmode="decimal" min="0" step="any" placeholder="0"></label>
+          <label>Sugar (g)<input name="sugar" type="number" inputmode="decimal" min="0" step="any" placeholder="0"></label>
+          <label>Sodium (mg)<input name="sodium" type="number" inputmode="decimal" min="0" step="any" placeholder="0"></label>
         </div>
 
         <div id="log-preview" class="preview"></div>
 
         <label class="checkbox">
-          <input name="saveToFoods" type="checkbox" checked> Also save to My Foods
+          <input name="saveToFoods" type="checkbox" checked> Save to My Foods
         </label>
         <p id="log-error" class="error" role="alert"></p>
         <button type="submit" class="button wide">Log this food</button>
