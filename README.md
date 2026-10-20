@@ -6,6 +6,28 @@ A simple personal nutrition tracker that runs in your phone's browser.
 
 ---
 
+## 0. Use it on your phone with GitHub Pages (no computer needed)
+
+GitHub can host the app for free as a website. A workflow file (`.github/workflows/deploy-pages.yml`) republishes it automatically every time the code changes.
+
+**Step A: make the repository public.** Free GitHub Pages only works on public repos, unless you have GitHub Pro. Only the *code* becomes visible. Your food log and profile are stored on your phone and are never uploaded.
+1. In your phone's browser (not the GitHub app), open <https://github.com/omar-elnaggar1/Nutrition-App>.
+2. Tap **Settings**. If you can't see it, swipe the row of tabs (Code, Issues, …) to the left.
+3. Scroll to the very bottom, to **Danger Zone** → **Change visibility** → **Change to public**, and confirm.
+
+**Step B: turn on GitHub Pages.**
+1. Still in **Settings**, tap **Pages** in the menu.
+2. Under **Build and deployment** → **Source**, choose **GitHub Actions**.
+
+**Step C: publish.**
+1. Tap the **Actions** tab → **Publish app to GitHub Pages** → **Run workflow** → **Run workflow**.
+2. Wait about 1 minute for the green tick ✅.
+3. Open **<https://omar-elnaggar1.github.io/Nutrition-App/>**.
+
+**Step D: add it to your home screen** (see section 2 below), and always open the app from that icon. On iPhone, the home-screen app and a Safari tab keep **separate** data, and the home-screen app's data is the safest from being cleared automatically.
+
+> The GitHub Pages version is just the app's pages. It has no server, so the Phase 2 photo-scanning feature will need a small server hosted somewhere else (GitHub Pages can't keep an API key secret).
+
 ## 1. Run it on your computer
 
 You need **Node.js** (the program that runs the server).
