@@ -1,0 +1,14 @@
+{
+  "name": "nutrition-app",
+  "version": "1.0.0",
+  "description": "Personal nutrition tracker that works in your phone's browser",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20.12"
+  }
+}
